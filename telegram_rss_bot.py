@@ -52,33 +52,29 @@ def summarize_text(text, max_sentences=2):
     return " ".join(sentences[:max_sentences])
 
 
+# Parse feed and post
 def fetch_and_send():
-    global sent_history
+    global sent_history, post_log
     now = datetime.now(LOCAL_TZ)
     ten_minutes_ago = now - timedelta(minutes=10)
-    new_posts_count = {}
 
-    logging.info(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Running fetch...")
+    new_posts_count = {}  # Move this inside the function
 
     for source_name, url in FEEDS.items():
         feed = feedparser.parse(url)
         new_posts = []
-        logging.info(f"{source_name}: {len(feed.entries)} entries found")
 
         for entry in feed.entries:
             published = entry.get("published_parsed") or entry.get("updated_parsed")
             if not published:
-                logging.warning(f"{source_name}: Skipping entry without timestamp")
                 continue
 
             published_dt = datetime.fromtimestamp(time.mktime(published), tz=utc).astimezone(LOCAL_TZ)
             if published_dt < ten_minutes_ago:
-                logging.debug(f"{source_name}: Skipping old post ({published_dt})")
                 continue
 
             unique_id = entry.get("id") or entry.get("link")
             if unique_id in sent_history:
-                logging.debug(f"{source_name}: Skipping already sent post")
                 continue
 
             title = html.unescape(entry.get("title", "No Title"))
@@ -103,9 +99,9 @@ def fetch_and_send():
                         caption=title,
                         parse_mode=ParseMode.HTML
                     )
-                    time.sleep(1.5)
+                    time.sleep(1.5)  # Flood control
             except Exception as e:
-                logging.warning(f"{source_name}: No image sent: {e}")
+                logging.warning(f"No image sent: {e}")
 
             bot.send_message(
                 chat_id=CHANNEL_USERNAME,
@@ -113,29 +109,27 @@ def fetch_and_send():
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
-            time.sleep(1.5)
+            time.sleep(1.5)  # Flood control
 
             sent_history.add(unique_id)
             new_posts.append(entry)
 
         new_posts_count[source_name] = len(new_posts)
-        logging.info(f"{source_name}: {len(new_posts)} new post(s) sent")
 
-# Post summary to console and Telegram
-summary_lines = [f"{source} → {count} post(s)" for source, count in new_posts_count.items()]
-summary_text = "\n".join(summary_lines)
-log_msg = f"📊 <b>RSS Summary</b> ({now.strftime('%Y-%m-%d %H:%M')}):\n\n{html.escape(summary_text)}"
+    # Post summary to console and Telegram
+    summary_lines = [f"{source} → {count} post(s)" for source, count in new_posts_count.items()]
+    summary_text = "\n".join(summary_lines)
+    log_msg = f"📊 <b>RSS Summary</b> ({now.strftime('%Y-%m-%d %H:%M')}):\n\n{html.escape(summary_text)}"
 
-logging.info(f"Fetched new posts:\n{summary_text}")
+    logging.info(f"Fetched new posts:\n{summary_text}")
 
-# Send to Telegram even if no new posts
-bot.send_message(
-    chat_id=CHANNEL_USERNAME,
-    text=log_msg,
-    parse_mode=ParseMode.HTML,
-    disable_web_page_preview=True
-)
-
+    # Send to Telegram even if no new posts
+    bot.send_message(
+        chat_id=CHANNEL_USERNAME,
+        text=log_msg,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
 
 # Scheduler
 scheduler = BackgroundScheduler(timezone=LOCAL_TZ)
