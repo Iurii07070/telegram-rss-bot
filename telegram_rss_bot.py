@@ -60,7 +60,9 @@ def fetch_and_send():
 
     new_posts_count = {}
     
+# Initialize vars
 ten_minutes_ago = datetime.now(LOCAL_TZ) - timedelta(minutes=10)
+new_posts_count = {}
 
 for source_name, url in FEEDS.items():
     feed = feedparser.parse(url)
@@ -84,15 +86,15 @@ for source_name, url in FEEDS.items():
         summary = summarize_text(description)
         translation = translator.translate(summary, src="es", dest="ru").text
 
-        msg = f"📰 <b>{html.escape(source_name)}: {html.escape(title)}</b>\n\n" \
+        msg = f"📰 <b>{html.escape(title)}</b>\n\n" \
               f"{html.escape(summary)}\n\n" \
               f"🇷🇺 {html.escape(translation)}\n\n" \
               f"🔗 <a href='{entry.link}'>Read More</a>"
 
         try:
             image_url = (
-                entry.get("media_content", [{}])[0].get("url")
-                or entry.get("media_thumbnail", [{}])[0].get("url")
+                entry.get("media_content", [{}])[0].get("url") or
+                entry.get("media_thumbnail", [{}])[0].get("url")
             )
             if image_url:
                 bot.send_photo(
@@ -103,7 +105,7 @@ for source_name, url in FEEDS.items():
                 )
                 time.sleep(1.5)  # Flood control
         except Exception as e:
-            logging.warning(f"No image sent for {title}: {e}")
+            logging.warning(f"No image sent: {e}")
 
         bot.send_message(
             chat_id=CHANNEL_USERNAME,
@@ -120,10 +122,9 @@ for source_name, url in FEEDS.items():
 
 # Optional: Post summary of updates
 if any(new_posts_count.values()):
-    summary_text = "\n".join([f"{name} → {count} post(s)" for name, count in new_posts_count.items()])
+    summary_text = "\n".join([f"{source} → {count} post(s)" for source, count in new_posts_count.items()])
     logging.info(f"Fetched new posts:\n{summary_text}")
-
-
+    
 # Scheduler
 scheduler = BackgroundScheduler(timezone=LOCAL_TZ)
 scheduler.add_job(fetch_and_send, "interval", minutes=10)
