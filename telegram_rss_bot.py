@@ -38,7 +38,6 @@ FEEDS = {
 bot = Bot(token=BOT_TOKEN, request=Request(con_pool_size=8))
 translator = Translator()
 sent_history = set()
-post_log = {}
 
 # NLP setup
 import nltk
@@ -47,88 +46,95 @@ nltk.download("punkt")
 # Timezone
 LOCAL_TZ = timezone("Europe/Madrid")
 
-# Format text and sanitize
+
 def summarize_text(text, max_sentences=2):
     sentences = sent_tokenize(html.unescape(text))
     return " ".join(sentences[:max_sentences])
 
-# Parse feed and post
+
 def fetch_and_send():
-    global sent_history, post_log
+    global sent_history
     now = datetime.now(LOCAL_TZ)
     ten_minutes_ago = now - timedelta(minutes=10)
-
     new_posts_count = {}
-    
-# Initialize vars
-ten_minutes_ago = datetime.now(LOCAL_TZ) - timedelta(minutes=10)
-new_posts_count = {}
 
-for source_name, url in FEEDS.items():
-    feed = feedparser.parse(url)
-    new_posts = []
+    logging.info(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Running fetch...")
 
-    for entry in feed.entries:
-        published = entry.get("published_parsed") or entry.get("updated_parsed")
-        if not published:
-            continue
+    for source_name, url in FEEDS.items():
+        feed = feedparser.parse(url)
+        new_posts = []
+        logging.info(f"{source_name}: {len(feed.entries)} entries found")
 
-        published_dt = datetime.fromtimestamp(time.mktime(published), tz=utc).astimezone(LOCAL_TZ)
-        if published_dt < ten_minutes_ago:
-            continue
+        for entry in feed.entries:
+            published = entry.get("published_parsed") or entry.get("updated_parsed")
+            if not published:
+                logging.warning(f"{source_name}: Skipping entry without timestamp")
+                continue
 
-        unique_id = entry.get("id") or entry.get("link")
-        if unique_id in sent_history:
-            continue
+            published_dt = datetime.fromtimestamp(time.mktime(published), tz=utc).astimezone(LOCAL_TZ)
+            if published_dt < ten_minutes_ago:
+                logging.debug(f"{source_name}: Skipping old post ({published_dt})")
+                continue
 
-        title = html.unescape(entry.get("title", "No Title"))
-        description = html.unescape(entry.get("summary", ""))
-        summary = summarize_text(description)
-        translation = translator.translate(summary, src="es", dest="ru").text
+            unique_id = entry.get("id") or entry.get("link")
+            if unique_id in sent_history:
+                logging.debug(f"{source_name}: Skipping already sent post")
+                continue
 
-        msg = f"📰 <b>{html.escape(title)}</b>\n\n" \
-              f"{html.escape(summary)}\n\n" \
-              f"🇷🇺 {html.escape(translation)}\n\n" \
-              f"🔗 <a href='{entry.link}'>Read More</a>"
+            title = html.unescape(entry.get("title", "No Title"))
+            description = html.unescape(entry.get("summary", ""))
+            summary = summarize_text(description)
+            translation = translator.translate(summary, src="es", dest="ru").text
 
-        try:
-            image_url = (
-                entry.get("media_content", [{}])[0].get("url") or
-                entry.get("media_thumbnail", [{}])[0].get("url")
-            )
-            if image_url:
-                bot.send_photo(
-                    chat_id=CHANNEL_USERNAME,
-                    photo=image_url,
-                    caption=title,
-                    parse_mode=ParseMode.HTML
+            msg = f"📰 <b>{html.escape(title)}</b>\n\n" \
+                  f"{html.escape(summary)}\n\n" \
+                  f"🇷🇺 {html.escape(translation)}\n\n" \
+                  f"🔗 <a href='{entry.link}'>Read More</a>"
+
+            try:
+                image_url = (
+                    entry.get("media_content", [{}])[0].get("url") or
+                    entry.get("media_thumbnail", [{}])[0].get("url")
                 )
-                time.sleep(1.5)  # Flood control
-        except Exception as e:
-            logging.warning(f"No image sent: {e}")
+                if image_url:
+                    bot.send_photo(
+                        chat_id=CHANNEL_USERNAME,
+                        photo=image_url,
+                        caption=title,
+                        parse_mode=ParseMode.HTML
+                    )
+                    time.sleep(1.5)
+            except Exception as e:
+                logging.warning(f"{source_name}: No image sent: {e}")
 
-        bot.send_message(
-            chat_id=CHANNEL_USERNAME,
-            text=msg,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-        time.sleep(1.5)  # Flood control
+            bot.send_message(
+                chat_id=CHANNEL_USERNAME,
+                text=msg,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+            time.sleep(1.5)
 
-        sent_history.add(unique_id)
-        new_posts.append(entry)
+            sent_history.add(unique_id)
+            new_posts.append(entry)
 
-    new_posts_count[source_name] = len(new_posts)
+        new_posts_count[source_name] = len(new_posts)
+        logging.info(f"{source_name}: {len(new_posts)} new post(s) sent")
 
-# Optional: Post summary of updates
-if any(new_posts_count.values()):
-    summary_text = "\n".join([f"{source} → {count} post(s)" for source, count in new_posts_count.items()])
-    logging.info(f"Fetched new posts:\n{summary_text}")
-    
+    if any(new_posts_count.values()):
+        summary_text = "\n".join([f"{source} → {count} post(s)" for source, count in new_posts_count.items()])
+        logging.info(f"New posts summary:\n{summary_text}")
+    else:
+        logging.info("No new posts found")
+
+
 # Scheduler
 scheduler = BackgroundScheduler(timezone=LOCAL_TZ)
 scheduler.add_job(fetch_and_send, "interval", minutes=10)
 scheduler.start()
+
+# Run once immediately
+fetch_and_send()
 
 # Start bot loop
 print("Bot is running...")
