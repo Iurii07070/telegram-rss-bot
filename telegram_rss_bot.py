@@ -3,10 +3,10 @@ import time
 import feedparser
 import logging
 import html
+import json
 from datetime import datetime, timedelta
 from pytz import timezone, utc
 from apscheduler.schedulers.background import BackgroundScheduler
-
 from telegram import Bot, ParseMode
 from telegram.utils.request import Request
 from googletrans import Translator
@@ -16,23 +16,11 @@ from nltk.tokenize import sent_tokenize
 logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
-
-FEEDS = {
-    "La Vanguardia": "https://www.lavanguardia.com/rss/home.xml",
-    "ABC España": "https://www.abc.es/rss/feeds/abc_espana.xml",
-    "El Mundo": "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml",
-    "El Confidencial": "https://rss.elconfidencial.com/espana/espana.xml",
-    "Europa Press": "https://www.europapress.es/rss/rss.aspx",
-    "20 Minutos": "https://rss.20minutos.es/rss/espana/",
-    "Eldiario.es": "https://www.eldiario.es/rss",
-    "La Razón": "https://www.larazon.es/rss",
-    "El Periódico": "https://www.elperiodico.com/rss",
-    "ARA": "https://www.ara.cat/rss",
-    "TV3": "https://www.ccma.cat/tv3/rss/",
-    "La Vanguardia Catalunya": "https://www.lavanguardia.com/rss/catalunya.xml",
-    "El Punt Avui": "https://www.elpuntavui.cat/rss",
-    "Catalunya Ràdio": "https://www.catradio.cat/feed/"
-}
+FETCH_INTERVAL_MINUTES = int(os.getenv("FETCH_INTERVAL_MINUTES", 10))  # Default is 10 min
+MAX_ARTICLE_AGE_MINUTES = int(os.getenv("MAX_ARTICLE_AGE_MINUTES", 300))  # in minutes
+MAX_DELTA_TIME_MINUTES = int(os.getenv("MAX_DELTA_TIME_MINUTES", 5))
+feeds_json = os.getenv("FEEDS_JSON", "{}")
+FEEDS = json.loads(feeds_json)
 
 # Init
 bot = Bot(token=BOT_TOKEN, request=Request(con_pool_size=8))
@@ -57,7 +45,7 @@ def summarize_text(text, max_sentences=2):
 def fetch_and_send():
     global sent_history, post_log
     now = datetime.now(LOCAL_TZ)
-    ten_minutes_ago = now - timedelta(minutes=10)
+    delta_time = now - timedelta(minutes=MAX_DELTA_TIME_MINUTES)  # MAX_ARTICLE_AGE in minutes
 
     new_posts_count = {}  # Move this inside the function
 
@@ -71,7 +59,7 @@ def fetch_and_send():
                 continue
 
             published_dt = datetime.fromtimestamp(time.mktime(published), tz=utc).astimezone(LOCAL_TZ)
-            if published_dt < ten_minutes_ago:
+            if published_dt < delta_time:
                 continue
 
             unique_id = entry.get("id") or entry.get("link")
@@ -134,7 +122,8 @@ def fetch_and_send():
 
 # Scheduler
 scheduler = BackgroundScheduler(timezone=LOCAL_TZ)
-scheduler.add_job(fetch_and_send, "interval", minutes=10)
+scheduler.add_job(fetch_and_send, "interval", minutes=FETCH_INTERVAL_MINUTES)
+print(f"Bot is running every {FETCH_INTERVAL_MINUTES} minutes...")
 scheduler.start()
 
 # Run once immediately
