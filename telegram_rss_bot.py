@@ -121,11 +121,20 @@ def fetch_and_send():
         new_posts_count[source_name] = len(new_posts)
         logging.info(f"{source_name}: {len(new_posts)} new post(s) sent")
 
-    if any(new_posts_count.values()):
-        summary_text = "\n".join([f"{source} → {count} post(s)" for source, count in new_posts_count.items()])
-        logging.info(f"New posts summary:\n{summary_text}")
-    else:
-        logging.info("No new posts found")
+# Post summary to console and Telegram
+summary_lines = [f"{source} → {count} post(s)" for source, count in new_posts_count.items()]
+summary_text = "\n".join(summary_lines)
+log_msg = f"📊 <b>RSS Summary</b> ({now.strftime('%Y-%m-%d %H:%M')}):\n\n{html.escape(summary_text)}"
+
+logging.info(f"Fetched new posts:\n{summary_text}")
+
+# Send to Telegram even if no new posts
+bot.send_message(
+    chat_id=CHANNEL_USERNAME,
+    text=log_msg,
+    parse_mode=ParseMode.HTML,
+    disable_web_page_preview=True
+)
 
 
 # Scheduler
