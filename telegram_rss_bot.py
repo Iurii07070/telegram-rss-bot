@@ -42,6 +42,7 @@ sent_history = set()
 # NLP setup
 import nltk
 nltk.download("punkt")
+nltk.download('punkt_tab')
 
 # Timezone
 LOCAL_TZ = timezone("Europe/Madrid")
