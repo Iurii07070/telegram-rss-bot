@@ -59,6 +59,8 @@ def fetch_and_send():
     ten_minutes_ago = now - timedelta(minutes=10)
 
     new_posts_count = {}
+    
+ten_minutes_ago = datetime.now(LOCAL_TZ) - timedelta(minutes=10)
 
 for source_name, url in FEEDS.items():
     feed = feedparser.parse(url)
