@@ -16,13 +16,11 @@ from nltk.tokenize import sent_tokenize
 logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
-FETCH_INTERVAL_MINUTES = int(os.getenv("FETCH_INTERVAL_MINUTES", 10))  # Default is 10 min
-MAX_ARTICLE_AGE_MINUTES = int(os.getenv("MAX_ARTICLE_AGE_MINUTES", 300))  # in minutes
-MAX_DELTA_TIME_MINUTES = int(os.getenv("MAX_DELTA_TIME_MINUTES", 5))
-feeds_json = os.getenv("FEEDS_JSON", "{}")
+FETCH_INTERVAL_MINUTES = int(os.getenv("FETCH_INTERVAL_MINUTES"))  
+MAX_ARTICLE_AGE_MINUTES = int(os.getenv("MAX_ARTICLE_AGE_MINUTES") 
+MAX_DELTA_TIME_MINUTES = int(os.getenv("MAX_DELTA_TIME_MINUTES"))
+feeds_json = os.getenv("FEEDS_JSON")
 FEEDS = json.loads(feeds_json)
-print("ENV:", dict(os.environ))  # Full dump
-print("FEEDS_JSON:", os.getenv("FEEDS_JSON"))
 
 # Init
 bot = Bot(token=BOT_TOKEN, request=Request(con_pool_size=8))
