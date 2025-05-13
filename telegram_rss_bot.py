@@ -12,29 +12,15 @@ from telegram.utils.request import Request
 from googletrans import Translator
 from nltk.tokenize import sent_tokenize
 
+# Setup
 logging.basicConfig(level=logging.INFO)
-
-# Correctly read environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
-FETCH_INTERVAL_MINUTES = os.getenv("FETCH_INTERVAL_MINUTES")  # Leave as string
-MAX_ARTICLE_AGE_MINUTES = os.getenv("MAX_ARTICLE_AGE_MINUTES")  # Leave as string
-MAX_DELTA_TIME_MINUTES = os.getenv("MAX_DELTA_TIME_MINUTES")  # Leave as string
-feeds_json = os.getenv("FEEDS_JSON")
-
-# Safely parse JSON string for feeds
-if feeds_json:
-    FEEDS = json.loads(feeds_json)  # Parse FEEDS_JSON into a dictionary
-else:
-    FEEDS = {}
-
-# Optionally log the values (excluding sensitive ones like BOT_TOKEN)
-logging.info(f"Bot Token: {BOT_TOKEN}")
-logging.info(f"Channel Username: {CHANNEL_USERNAME}")
-logging.info(f"Fetch Interval: {FETCH_INTERVAL_MINUTES} minutes")
-logging.info(f"Max Article Age: {MAX_ARTICLE_AGE_MINUTES} minutes")
-logging.info(f"Max Delta Time: {MAX_DELTA_TIME_MINUTES} minutes")
-logging.info(f"Feeds: {FEEDS}")
+FETCH_INTERVAL_MINUTES = int(os.getenv("FETCH_INTERVAL_MINUTES", 10))  # Default is 10 min
+MAX_ARTICLE_AGE_MINUTES = int(os.getenv("MAX_ARTICLE_AGE_MINUTES", 300))  # in minutes
+MAX_DELTA_TIME_MINUTES = int(os.getenv("MAX_DELTA_TIME_MINUTES", 5))
+feeds_json = os.getenv("FEEDS_JSON", "{}")
+FEEDS = json.loads(feeds_json)
 
 # Init
 bot = Bot(token=BOT_TOKEN, request=Request(con_pool_size=8))
