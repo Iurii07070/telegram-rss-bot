@@ -21,6 +21,8 @@ MAX_ARTICLE_AGE_MINUTES = int(os.getenv("MAX_ARTICLE_AGE_MINUTES", 300))  # in m
 MAX_DELTA_TIME_MINUTES = int(os.getenv("MAX_DELTA_TIME_MINUTES", 5))
 feeds_json = os.getenv("FEEDS_JSON", "{}")
 FEEDS = json.loads(feeds_json)
+print("ENV:", dict(os.environ))  # Full dump
+print("FEEDS_JSON:", os.getenv("FEEDS_JSON"))
 
 # Init
 bot = Bot(token=BOT_TOKEN, request=Request(con_pool_size=8))
